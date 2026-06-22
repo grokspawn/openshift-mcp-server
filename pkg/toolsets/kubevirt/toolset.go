@@ -10,11 +10,13 @@ import (
 	vm_create "github.com/containers/kubernetes-mcp-server/pkg/toolsets/kubevirt/vm/create"
 	vm_guestagent "github.com/containers/kubernetes-mcp-server/pkg/toolsets/kubevirt/vm/guestagent"
 	vm_lifecycle "github.com/containers/kubernetes-mcp-server/pkg/toolsets/kubevirt/vm/lifecycle"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 type Toolset struct{}
 
 var _ api.Toolset = (*Toolset)(nil)
+var _ api.GVKRequired = (*Toolset)(nil)
 
 func (t *Toolset) GetName() string {
 	return "kubevirt"
@@ -22,6 +24,12 @@ func (t *Toolset) GetName() string {
 
 func (t *Toolset) GetDescription() string {
 	return kubevirtdefaults.ToolsetDescription()
+}
+
+func (t *Toolset) GetRequiredGVKs() []schema.GroupVersionKind {
+	return []schema.GroupVersionKind{
+		{Group: "kubevirt.io", Version: "v1", Kind: "VirtualMachine"},
+	}
 }
 
 func (t *Toolset) GetTools(_ api.Openshift) []api.ServerTool {

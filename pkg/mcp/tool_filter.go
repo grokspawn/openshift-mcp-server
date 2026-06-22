@@ -3,6 +3,7 @@ package mcp
 import (
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 // ToolFilter is a function that takes a ServerTool and returns a boolean indicating whether to include the tool
@@ -18,6 +19,31 @@ func CompositeFilter(filters ...ToolFilter) ToolFilter {
 
 		return true
 	}
+}
+
+// GVKAvailabilityFilter returns a ToolFilter that excludes tools whose
+// RequiredGVKs are not satisfied by the provider's cluster state.
+func GVKAvailabilityFilter(hasGVKs func([]schema.GroupVersionKind) bool) ToolFilter {
+	return func(tool api.ServerTool) bool {
+		if len(tool.RequiredGVKs) == 0 {
+			return true
+		}
+		return hasGVKs(tool.RequiredGVKs)
+	}
+}
+
+// toolsetSatisfiesGVKs returns true if a toolset's GVK requirements are met.
+// Toolsets that don't implement GVKRequired are always satisfied.
+func toolsetSatisfiesGVKs(toolset api.Toolset, hasGVKs func([]schema.GroupVersionKind) bool) bool {
+	gvkAware, ok := toolset.(api.GVKRequired)
+	if !ok {
+		return true
+	}
+	required := gvkAware.GetRequiredGVKs()
+	if len(required) == 0 {
+		return true
+	}
+	return hasGVKs(required)
 }
 
 func ShouldIncludeTargetListTool(targetName string, isMultiTarget bool) ToolFilter {

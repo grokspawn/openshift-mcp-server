@@ -5,6 +5,7 @@ import (
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/stretchr/testify/suite"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/utils/ptr"
 )
 
@@ -83,6 +84,74 @@ func (s *ToolFilterSuite) TestShouldIncludeTargetListTool() {
 		})
 	})
 }
+
+func (s *ToolFilterSuite) TestGVKAvailabilityFilter() {
+	kubevirtGVK := schema.GroupVersionKind{Group: "kubevirt.io", Version: "v1", Kind: "VirtualMachine"}
+
+	s.Run("tool with no RequiredGVKs is always included", func() {
+		filter := GVKAvailabilityFilter(func(_ []schema.GroupVersionKind) bool { return false })
+		tool := api.ServerTool{Tool: api.Tool{Name: "namespaces_list"}}
+		s.True(filter(tool))
+	})
+
+	s.Run("tool with satisfied RequiredGVKs is included", func() {
+		filter := GVKAvailabilityFilter(func(_ []schema.GroupVersionKind) bool { return true })
+		tool := api.ServerTool{
+			Tool:         api.Tool{Name: "vm_list"},
+			RequiredGVKs: []schema.GroupVersionKind{kubevirtGVK},
+		}
+		s.True(filter(tool))
+	})
+
+	s.Run("tool with unsatisfied RequiredGVKs is excluded", func() {
+		filter := GVKAvailabilityFilter(func(_ []schema.GroupVersionKind) bool { return false })
+		tool := api.ServerTool{
+			Tool:         api.Tool{Name: "vm_list"},
+			RequiredGVKs: []schema.GroupVersionKind{kubevirtGVK},
+		}
+		s.False(filter(tool))
+	})
+}
+
+func (s *ToolFilterSuite) TestToolsetSatisfiesGVKs() {
+	kubevirtGVK := schema.GroupVersionKind{Group: "kubevirt.io", Version: "v1", Kind: "VirtualMachine"}
+
+	s.Run("toolset without GVKRequired is always satisfied", func() {
+		ts := &plainToolset{}
+		s.True(toolsetSatisfiesGVKs(ts, func(_ []schema.GroupVersionKind) bool { return false }))
+	})
+
+	s.Run("GVKRequired toolset with satisfied requirements", func() {
+		ts := &gvkToolset{gvks: []schema.GroupVersionKind{kubevirtGVK}}
+		s.True(toolsetSatisfiesGVKs(ts, func(_ []schema.GroupVersionKind) bool { return true }))
+	})
+
+	s.Run("GVKRequired toolset with unsatisfied requirements", func() {
+		ts := &gvkToolset{gvks: []schema.GroupVersionKind{kubevirtGVK}}
+		s.False(toolsetSatisfiesGVKs(ts, func(_ []schema.GroupVersionKind) bool { return false }))
+	})
+
+	s.Run("GVKRequired toolset with empty requirements is satisfied", func() {
+		ts := &gvkToolset{gvks: []schema.GroupVersionKind{}}
+		s.True(toolsetSatisfiesGVKs(ts, func(_ []schema.GroupVersionKind) bool { return false }))
+	})
+}
+
+type plainToolset struct{}
+
+func (t *plainToolset) GetName() string                                    { return "plain" }
+func (t *plainToolset) GetDescription() string                             { return "" }
+func (t *plainToolset) GetTools(_ api.Openshift) []api.ServerTool          { return nil }
+func (t *plainToolset) GetPrompts() []api.ServerPrompt                     { return nil }
+func (t *plainToolset) GetResources() []api.ServerResource                 { return nil }
+func (t *plainToolset) GetResourceTemplates() []api.ServerResourceTemplate { return nil }
+
+type gvkToolset struct {
+	plainToolset
+	gvks []schema.GroupVersionKind
+}
+
+func (t *gvkToolset) GetRequiredGVKs() []schema.GroupVersionKind { return t.gvks }
 
 func TestToolFilter(t *testing.T) {
 	suite.Run(t, new(ToolFilterSuite))

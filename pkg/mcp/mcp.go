@@ -379,6 +379,7 @@ func (s *Server) collectApplicableTools(cfg *Configuration) []api.ServerTool {
 	filter := CompositeFilter(
 		cfg.isToolApplicable,
 		ShouldIncludeTargetListTool(s.p.GetTargetParameterName(), s.p.IsMultiTarget()),
+		GVKAvailabilityFilter(s.p.HasGVKs),
 	)
 	mutator := ComposeMutators(
 		WithTargetParameter(s.p.GetDefaultTarget(), s.p.GetTargetParameterName(), s.p.IsMultiTarget()),
@@ -388,6 +389,9 @@ func (s *Server) collectApplicableTools(cfg *Configuration) []api.ServerTool {
 
 	tools := make([]api.ServerTool, 0)
 	for _, toolset := range cfg.Toolsets() {
+		if !toolsetSatisfiesGVKs(toolset, s.p.HasGVKs) {
+			continue
+		}
 		for _, tool := range toolset.GetTools(s.p) {
 			tool = mutator(tool)
 			if filter(tool) {
@@ -404,6 +408,9 @@ func (s *Server) collectApplicablePrompts(cfg *Configuration) []api.ServerPrompt
 
 	toolsetPrompts := make([]api.ServerPrompt, 0)
 	for _, toolset := range cfg.Toolsets() {
+		if !toolsetSatisfiesGVKs(toolset, s.p.HasGVKs) {
+			continue
+		}
 		for _, prompt := range toolset.GetPrompts() {
 			toolsetPrompts = append(toolsetPrompts, mutator(prompt))
 		}
@@ -419,6 +426,9 @@ func (s *Server) collectApplicableResources(cfg *Configuration) []api.ServerReso
 
 	resources := make([]api.ServerResource, 0)
 	for _, toolset := range cfg.Toolsets() {
+		if !toolsetSatisfiesGVKs(toolset, s.p.HasGVKs) {
+			continue
+		}
 		for _, resource := range toolset.GetResources() {
 			resource = mutator(resource)
 			if filter(resource) {
@@ -436,6 +446,9 @@ func (s *Server) collectApplicableResourceTemplates(cfg *Configuration) []api.Se
 
 	templates := make([]api.ServerResourceTemplate, 0)
 	for _, toolset := range cfg.Toolsets() {
+		if !toolsetSatisfiesGVKs(toolset, s.p.HasGVKs) {
+			continue
+		}
 		for _, template := range toolset.GetResourceTemplates() {
 			template = mutator(template)
 			if filter(template) {

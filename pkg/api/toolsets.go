@@ -7,6 +7,7 @@ import (
 
 	"github.com/containers/kubernetes-mcp-server/pkg/output"
 	"github.com/google/jsonschema-go/jsonschema"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 type ServerTool struct {
@@ -14,6 +15,7 @@ type ServerTool struct {
 	Handler            ToolHandlerFunc
 	ClusterAware       *bool
 	TargetListProvider *bool
+	RequiredGVKs       []schema.GroupVersionKind
 }
 
 // IsClusterAware indicates whether the tool can accept a "cluster" or "context" parameter
@@ -53,6 +55,15 @@ type Toolset interface {
 	// GetResourceTemplates returns the resource templates provided by this toolset.
 	// Returns nil if the toolset doesn't provide any resource templates.
 	GetResourceTemplates() []ServerResourceTemplate
+}
+
+// GVKRequired is an optional interface that toolsets can implement to declare
+// required GroupVersionKinds. When implemented, the toolset's tools, prompts,
+// resources, and resource templates are only included when all required GVKs
+// are available on the cluster. Toolsets that do not implement this interface
+// are always included when configured.
+type GVKRequired interface {
+	GetRequiredGVKs() []schema.GroupVersionKind
 }
 
 type ToolCallRequest interface {
